@@ -1,6 +1,6 @@
 {
-  "name": "ANODEFLEX 4 nodos Beta",
-  "short_name": "ANODEFLEX 4 Beta",
+  "name": "ANODEFLEX 4 nodos Gama",
+  "short_name": "ANODEFLEX 4 Gama",
   "description": "Mediciones de campo y regulación de 8 ramas en 4 nodos.",
   "start_url": "./",
   "display": "standalone",

@@ -13,3 +13,20 @@ assert.equal(m.adjust({...cables,fixed:r.fixed,targets,maxReo:.0001}).feasible,f
 assert.throws(()=>m.dimension({...input,voltages:{...voltages,1:31}}),/voltage-rise/);assert.throws(()=>m.dimension({...input,currents:{...currents,11:0}}),/invalid-input/);
 if(SPLIT<N)assert.throws(()=>m.dimension({...input,voltages:{...voltages,[SPLIT+1]:26}}),/voltage-rise/);
 console.log('Calibración y regulación: correctas');
+
+// Siete ramas: R42 no existe y el resto mantiene el balance eléctrico.
+const missing='42',other='41';const active=Object.fromEntries(ids.map(id=>[id,id!==missing]));
+const measured={...currents,[missing]:0},cal=m.dimension({...input,currents:measured,active});
+assert.equal(cal.fixed[missing],null);assert.equal(cal.currents[missing],0);
+const derived=Object.fromEntries(m.NODES.map(n=>['Rc'+n,cal.cables[n]]));
+const inactiveOp=m.simulate({V:30,...derived,fixed:cal.fixed,rheostats:zero,active});
+assert.equal(inactiveOp.currents[missing],0);assert.ok(near(inactiveOp.pError,0));
+for(let n=1;n<=N;n++){assert.ok(near(inactiveOp.trunks[n],inactiveOp.currents[n+'1']+inactiveOp.currents[n+'2']+(n<N?inactiveOp.trunks[n+1]:0)));assert.ok(near((n===1?inactiveOp.V:inactiveOp.voltages[n-1])-inactiveOp.voltages[n],inactiveOp.trunks[n]*derived['Rc'+n]))}
+const inactiveTargets=Object.fromEntries(ids.map(id=>[id,active[id]?.325:0]));
+const inactiveAdj=m.adjust({...derived,fixed:cal.fixed,targets:inactiveTargets,active,maxReo:1000});assert.equal(inactiveAdj.feasible,true);assert.equal(inactiveAdj.rheostats[missing],0);
+const opAdjusted=m.simulate({V:inactiveAdj.V,...derived,fixed:cal.fixed,rheostats:inactiveAdj.rheostats,active});for(const id of ids)assert.ok(near(opAdjusted.currents[id],active[id]?.325:0));
+assert.throws(()=>m.dimension({...input,currents:{...measured,[other]:0},active:{...active,[other]:false}}),e=>e.message==='cable-undetermined'&&e.node===4);
+
+// Verificar una rama ausente en cada nodo, con todos los tramos medibles.
+for(const absent of ids){const selection=Object.fromEntries(ids.map(id=>[id,id!==absent]));const sample=m.dimension({...input,active:selection});assert.equal(sample.fixed[absent],null);const network=Object.fromEntries(m.NODES.map(n=>['Rc'+n,sample.cables[n]]));const sim=m.simulate({V:30,...network,fixed:sample.fixed,rheostats:zero,active:selection});assert.equal(sim.currents[absent],0);assert.ok(near(sim.pError,0));}
+if(SPLIT<N){const sel=Object.fromEntries(ids.map(id=>[id,!id.startsWith(String(SPLIT))]));assert.throws(()=>m.dimension({...input,active:sel}),e=>e.message==='cable-undetermined'&&e.node===SPLIT);}
